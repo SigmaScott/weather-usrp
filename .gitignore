@@ -1,0 +1,5 @@
+obj/
+weather-usrp
+usrp-announce
+compile_commands.json
+*.o
