@@ -107,6 +107,56 @@ static void test_same_format_json(void)
     ASSERT(strstr(buf, "\"048453\"") != NULL, "json has fips");
 }
 
+static void test_same_event_blacklisted_match(void)
+{
+    same_message_t msg;
+    same_parse(&msg, "ZCZC-WXR-RWT-048453+0100-1411545-KHOU/NWS-");
+
+    char bl[][SAME_EVENT_LEN + 1] = {"RWT", "RMT", "DMO"};
+    ASSERT_EQ_INT(same_event_blacklisted(&msg, bl, 3), 1,
+                  "RWT is blacklisted");
+}
+
+static void test_same_event_blacklisted_no_match(void)
+{
+    same_message_t msg;
+    same_parse(&msg, "ZCZC-WXR-TOR-048453+0100-1411545-KHOU/NWS-");
+
+    char bl[][SAME_EVENT_LEN + 1] = {"RWT", "RMT", "DMO"};
+    ASSERT_EQ_INT(same_event_blacklisted(&msg, bl, 3), 0,
+                  "TOR is not blacklisted");
+}
+
+static void test_same_event_blacklisted_empty(void)
+{
+    same_message_t msg;
+    same_parse(&msg, "ZCZC-WXR-RWT-048453+0100-1411545-KHOU/NWS-");
+
+    char bl[][SAME_EVENT_LEN + 1] = {""};
+    ASSERT_EQ_INT(same_event_blacklisted(&msg, bl, 0), 0,
+                  "empty blacklist allows all");
+}
+
+static void test_same_event_blacklisted_rmt(void)
+{
+    same_message_t msg;
+    same_parse(&msg, "ZCZC-WXR-RMT-048453+0100-1411545-KHOU/NWS-");
+
+    char bl[][SAME_EVENT_LEN + 1] = {"RWT", "RMT", "DMO"};
+    ASSERT_EQ_INT(same_event_blacklisted(&msg, bl, 3), 1,
+                  "RMT is blacklisted");
+}
+
+static void test_same_event_blacklisted_real_alert_passes(void)
+{
+    same_message_t msg;
+    same_parse(&msg, "ZCZC-WXR-SVR-048453+0045-1411545-KHOU/NWS-");
+
+    char bl[][SAME_EVENT_LEN + 1] = {"RWT", "RMT", "DMO"};
+    ASSERT_EQ_INT(same_event_blacklisted(&msg, bl, 3), 0,
+                  "SVR passes blacklist");
+}
+
 int main(void)
 {
     fprintf(stderr, "test_same:\n");
@@ -120,5 +170,10 @@ int main(void)
     RUN_TEST(test_same_match_fips_no_match);
     RUN_TEST(test_same_match_fips_empty_filter);
     RUN_TEST(test_same_format_json);
+    RUN_TEST(test_same_event_blacklisted_match);
+    RUN_TEST(test_same_event_blacklisted_no_match);
+    RUN_TEST(test_same_event_blacklisted_empty);
+    RUN_TEST(test_same_event_blacklisted_rmt);
+    RUN_TEST(test_same_event_blacklisted_real_alert_passes);
     TEST_SUMMARY();
 }

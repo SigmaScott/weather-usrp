@@ -59,6 +59,12 @@ static void eas_alert_handler(int channel, const char *message, void *userdata)
     }
 
     if (same_match_fips(&msg, ch->config->fips, ch->config->num_fips)) {
+        if (same_event_blacklisted(&msg, ch->config->event_blacklist,
+                                   ch->config->num_event_blacklist)) {
+            fprintf(stderr, "[ch%d] BLOCKED (blacklisted event %s)\n",
+                    channel, msg.event);
+            return;
+        }
         char formatted[256];
         same_format(&msg, formatted, sizeof(formatted));
         fprintf(stderr, "[ch%d] ALERT: %s\n", channel, formatted);
@@ -103,12 +109,31 @@ static void capture_callback(const uint8_t *buf, uint32_t len, void *userdata)
 static void usage(const char *prog)
 {
     fprintf(stderr, "Usage: %s [-c config.ini] [-v]\n", prog);
+    fprintf(stderr, "  Default config search: ./config.ini, /etc/weather-usrp/config.ini\n");
     exit(1);
+}
+
+static const char *find_config(void)
+{
+    static const char *search_paths[] = {
+        "config.ini",
+        "/etc/weather-usrp/config.ini",
+        NULL
+    };
+
+    for (int i = 0; search_paths[i]; i++) {
+        FILE *f = fopen(search_paths[i], "r");
+        if (f) {
+            fclose(f);
+            return search_paths[i];
+        }
+    }
+    return NULL;
 }
 
 int main(int argc, char *argv[])
 {
-    const char *config_path = "config.ini";
+    const char *config_path = NULL;
     int verbose = 0;
 
     int opt;
@@ -120,12 +145,23 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (!config_path) {
+        config_path = find_config();
+        if (!config_path) {
+            fprintf(stderr, "No config file found (tried ./config.ini, /etc/weather-usrp/config.ini)\n");
+            fprintf(stderr, "Use -c <path> to specify config file\n");
+            return 1;
+        }
+    }
+
     if (config_load(&cfg, config_path) < 0)
         return 1;
     cfg.verbose = verbose;
 
-    if (verbose)
+    if (verbose) {
+        fprintf(stderr, "Using config: %s\n", config_path);
         config_dump(&cfg);
+    }
 
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);

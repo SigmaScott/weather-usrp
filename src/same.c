@@ -104,6 +104,21 @@ int same_match_fips(const same_message_t *msg,
     return 0;
 }
 
+int same_event_blacklisted(const same_message_t *msg,
+                           const char blacklist[][SAME_EVENT_LEN + 1],
+                           int num_blacklist)
+{
+    if (num_blacklist == 0)
+        return 0;
+
+    for (int i = 0; i < num_blacklist; i++) {
+        if (strncmp(msg->event, blacklist[i], SAME_EVENT_LEN) == 0)
+            return 1;
+    }
+
+    return 0;
+}
+
 int same_format(const same_message_t *msg, char *buf, size_t buflen)
 {
     if (msg->is_eom)

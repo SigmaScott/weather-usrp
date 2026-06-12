@@ -38,6 +38,28 @@ static int parse_fips_list(channel_config_t *ch, const char *val)
     return 0;
 }
 
+static int parse_event_blacklist(channel_config_t *ch, const char *val)
+{
+    char buf[MAX_LINE];
+    strncpy(buf, val, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+
+    ch->num_event_blacklist = 0;
+    char *tok = strtok(buf, ",");
+    while (tok && ch->num_event_blacklist < SAME_MAX_BLACKLIST) {
+        while (isspace((unsigned char)*tok)) tok++;
+        char *end = tok + strlen(tok) - 1;
+        while (end > tok && isspace((unsigned char)*end)) *end-- = '\0';
+        if (strlen(tok) == SAME_EVENT_LEN) {
+            strncpy(ch->event_blacklist[ch->num_event_blacklist], tok, SAME_EVENT_LEN);
+            ch->event_blacklist[ch->num_event_blacklist][SAME_EVENT_LEN] = '\0';
+            ch->num_event_blacklist++;
+        }
+        tok = strtok(NULL, ",");
+    }
+    return 0;
+}
+
 int config_load(config_t *cfg, const char *path)
 {
     FILE *f = fopen(path, "r");
@@ -127,6 +149,8 @@ int config_load(config_t *cfg, const char *path)
                 cfg->channels[current_channel].usrp_port = (uint16_t)atoi(val);
             else if (strcmp(key, "fips") == 0)
                 parse_fips_list(&cfg->channels[current_channel], val);
+            else if (strcmp(key, "event_blacklist") == 0)
+                parse_event_blacklist(&cfg->channels[current_channel], val);
             else if (strcmp(key, "enabled") == 0)
                 cfg->channels[current_channel].enabled = atoi(val);
             break;
@@ -151,6 +175,11 @@ void config_dump(const config_t *cfg)
                i, ch->frequency / 1e6, ch->usrp_host, ch->usrp_port, ch->enabled);
         for (int j = 0; j < ch->num_fips; j++)
             printf("%s%s", j ? "," : "", ch->fips[j]);
+        if (ch->num_event_blacklist > 0) {
+            printf(" blacklist=");
+            for (int j = 0; j < ch->num_event_blacklist; j++)
+                printf("%s%s", j ? "," : "", ch->event_blacklist[j]);
+        }
         printf("\n");
     }
 }

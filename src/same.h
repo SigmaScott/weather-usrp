@@ -54,6 +54,18 @@ int same_match_fips(const same_message_t *msg,
                     int num_fips);
 
 /*
+ * Check if a SAME message's event code is in the blacklist.
+ * blacklist: array of 3-char event code strings
+ * num_blacklist: number of entries in blacklist
+ *
+ * Returns 1 if event IS blacklisted (should be rejected), 0 if allowed.
+ * Empty blacklist (num_blacklist == 0) allows all events.
+ */
+int same_event_blacklisted(const same_message_t *msg,
+                           const char blacklist[][SAME_EVENT_LEN + 1],
+                           int num_blacklist);
+
+/*
  * Format a SAME message as a human-readable string.
  * buf: output buffer
  * buflen: buffer size

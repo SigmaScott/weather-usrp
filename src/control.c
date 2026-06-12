@@ -23,20 +23,52 @@ static void send_to_client(int fd, const char *msg)
     }
 }
 
+static int parse_passthrough(const char *cmd, int *ch_out, int *on_out)
+{
+    int ch = -1;
+    char arg[8] = {0};
+
+    /* Short form: "p N 1" or "p N 0" */
+    if ((cmd[0] == 'p' || cmd[0] == 'P') &&
+        (cmd[1] == ' ' || cmd[1] == '\t') &&
+        strncasecmp(cmd, "PASSTHROUGH", 11) != 0) {
+        if (sscanf(cmd + 1, " %d %7s", &ch, arg) != 2)
+            return -1;
+    }
+    /* Long form: "PASSTHROUGH N ON|OFF" */
+    else if (strncasecmp(cmd, "PASSTHROUGH", 11) == 0) {
+        if (sscanf(cmd + 11, " %d %7s", &ch, arg) != 2)
+            return -1;
+    } else {
+        return -1;
+    }
+
+    if (ch < 0 || ch >= NUM_CHANNELS)
+        return -1;
+
+    *ch_out = ch;
+    *on_out = (strcasecmp(arg, "ON") == 0 || strcmp(arg, "1") == 0) ? 1 : 0;
+    return 0;
+}
+
+static int is_status_cmd(const char *cmd)
+{
+    return (cmd[0] == 's' && (cmd[1] == '\0' || cmd[1] == ' ' || cmd[1] == '\r')) ||
+           strncasecmp(cmd, "STATUS", 6) == 0;
+}
+
+static int is_quit_cmd(const char *cmd)
+{
+    return (cmd[0] == 'q' && (cmd[1] == '\0' || cmd[1] == ' ' || cmd[1] == '\r')) ||
+           strncasecmp(cmd, "QUIT", 4) == 0;
+}
+
 static void handle_command(control_t *ctl, int client_fd, const char *cmd)
 {
     char response[512];
+    int ch, on;
 
-    if (strncmp(cmd, "PASSTHROUGH", 11) == 0) {
-        int ch = -1;
-        char onoff[8] = {0};
-        if (sscanf(cmd + 11, " %d %7s", &ch, onoff) != 2 ||
-            ch < 0 || ch >= NUM_CHANNELS) {
-            send_to_client(client_fd, "ERR invalid channel");
-            return;
-        }
-
-        int on = (strcasecmp(onoff, "ON") == 0) ? 1 : 0;
+    if (parse_passthrough(cmd, &ch, &on) == 0) {
         pthread_mutex_lock(&ctl->lock);
         gate_set_passthrough(ctl->gates[ch], on);
         pthread_mutex_unlock(&ctl->lock);
@@ -45,7 +77,7 @@ static void handle_command(control_t *ctl, int client_fd, const char *cmd)
                  ch, on ? "on" : "off");
         send_to_client(client_fd, response);
 
-    } else if (strncmp(cmd, "STATUS", 6) == 0) {
+    } else if (is_status_cmd(cmd)) {
         char json[2048];
         int pos = 0;
         pos += snprintf(json + pos, sizeof(json) - pos, "{\"channels\":[");
@@ -68,8 +100,12 @@ static void handle_command(control_t *ctl, int client_fd, const char *cmd)
         snprintf(json + pos, sizeof(json) - pos, "]}");
         send_to_client(client_fd, json);
 
-    } else if (strncmp(cmd, "QUIT", 4) == 0) {
+    } else if (is_quit_cmd(cmd)) {
         send_to_client(client_fd, "OK bye");
+
+    } else if (cmd[0] == 'p' || cmd[0] == 'P') {
+        /* Passthrough parse failed — bad args */
+        send_to_client(client_fd, "ERR invalid channel");
 
     } else {
         send_to_client(client_fd, "ERR unknown command");
@@ -138,7 +174,7 @@ static void *control_thread(void *arg)
                 char *cr = strchr(line, '\r');
                 if (cr) *cr = '\0';
                 if (strlen(line) > 0) {
-                    if (strncmp(line, "QUIT", 4) == 0) {
+                    if (is_quit_cmd(line)) {
                         send_to_client(ctl->client_fds[i], "OK bye");
                         close(ctl->client_fds[i]);
                         ctl->client_fds[i] = ctl->client_fds[--ctl->num_clients];
@@ -154,7 +190,7 @@ static void *control_thread(void *arg)
                 char *cr = strchr(line, '\r');
                 if (cr) *cr = '\0';
                 if (strlen(line) > 0) {
-                    if (strncmp(line, "QUIT", 4) == 0) {
+                    if (is_quit_cmd(line)) {
                         send_to_client(ctl->client_fds[i], "OK bye");
                         close(ctl->client_fds[i]);
                         ctl->client_fds[i] = ctl->client_fds[--ctl->num_clients];

@@ -67,12 +67,20 @@ static void test_control_status(void)
     int client = connect_to_control(45050);
     ASSERT(client >= 0, "connected to control");
 
-    ssize_t wr = write(client, "STATUS\n", 7);
+    /* Short form: s */
+    ssize_t wr = write(client, "s\n", 2);
     (void)wr;
     char buf[1024];
     int r = read_line(client, buf, sizeof(buf));
     ASSERT_EQ_INT(r, 0, "got status response");
     ASSERT(strstr(buf, "channels") != NULL, "status has channels");
+
+    /* Long form still works: STATUS */
+    wr = write(client, "STATUS\n", 7);
+    (void)wr;
+    r = read_line(client, buf, sizeof(buf));
+    ASSERT_EQ_INT(r, 0, "got long-form status response");
+    ASSERT(strstr(buf, "channels") != NULL, "long-form status has channels");
 
     close(client);
     control_stop(&ctl);
@@ -99,20 +107,37 @@ static void test_control_passthrough(void)
     ASSERT(client >= 0, "connected");
 
     ssize_t wr;
-    wr = write(client, "PASSTHROUGH 2 ON\n", 17);
+    /* Short form: p 2 1 */
+    wr = write(client, "p 2 1\n", 6);
     (void)wr;
     char buf[256];
     read_line(client, buf, sizeof(buf));
-    ASSERT(strstr(buf, "OK") != NULL, "passthrough on OK");
+    ASSERT(strstr(buf, "OK") != NULL, "short passthrough on OK");
     ASSERT_EQ_INT(gate_get_state(&test_gates[2]), GATE_PASSTHROUGH,
                   "gate 2 is passthrough");
 
-    wr = write(client, "PASSTHROUGH 2 OFF\n", 18);
+    /* Short form: p 2 0 */
+    wr = write(client, "p 2 0\n", 6);
     (void)wr;
     read_line(client, buf, sizeof(buf));
-    ASSERT(strstr(buf, "OK") != NULL, "passthrough off OK");
+    ASSERT(strstr(buf, "OK") != NULL, "short passthrough off OK");
     ASSERT_EQ_INT(gate_get_state(&test_gates[2]), GATE_IDLE,
                   "gate 2 back to idle");
+
+    /* Long form still works */
+    wr = write(client, "PASSTHROUGH 3 ON\n", 17);
+    (void)wr;
+    read_line(client, buf, sizeof(buf));
+    ASSERT(strstr(buf, "OK") != NULL, "long passthrough on OK");
+    ASSERT_EQ_INT(gate_get_state(&test_gates[3]), GATE_PASSTHROUGH,
+                  "gate 3 is passthrough");
+
+    wr = write(client, "PASSTHROUGH 3 OFF\n", 18);
+    (void)wr;
+    read_line(client, buf, sizeof(buf));
+    ASSERT(strstr(buf, "OK") != NULL, "long passthrough off OK");
+    ASSERT_EQ_INT(gate_get_state(&test_gates[3]), GATE_IDLE,
+                  "gate 3 back to idle");
 
     close(client);
     control_stop(&ctl);
@@ -148,10 +173,19 @@ static void test_control_bad_command(void)
     struct timespec ts = {.tv_sec = 0, .tv_nsec = 10000000};
     nanosleep(&ts, NULL);
 
+    /* Bad channel with short form */
+    wr = write(client, "p 99 1\n", 7);
+    (void)wr;
+    read_line(client, buf, sizeof(buf));
+    ASSERT(strstr(buf, "ERR") != NULL, "bad channel short form returns ERR");
+
+    nanosleep(&ts, NULL);
+
+    /* Bad channel with long form */
     wr = write(client, "PASSTHROUGH 99 ON\n", 18);
     (void)wr;
     read_line(client, buf, sizeof(buf));
-    ASSERT(strstr(buf, "ERR") != NULL, "bad channel returns ERR");
+    ASSERT(strstr(buf, "ERR") != NULL, "bad channel long form returns ERR");
 
     close(client);
     control_stop(&ctl);

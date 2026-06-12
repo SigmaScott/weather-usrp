@@ -2,10 +2,11 @@
  * control.h - TCP text control interface
  *
  * Commands (client -> server):
- *   PASSTHROUGH <ch> ON    - enable passthrough on channel (0-6)
- *   PASSTHROUGH <ch> OFF   - disable passthrough on channel
- *   STATUS                 - request status of all channels
- *   QUIT                   - close connection
+ *   s                      - request status of all channels (JSON)
+ *   p <ch> <1|0>           - enable/disable passthrough on channel (0-6)
+ *   q                      - close connection
+ *
+ * Legacy long-form also accepted: STATUS, PASSTHROUGH <ch> ON|OFF, QUIT
  *
  * Responses (server -> client):
  *   OK <message>           - command accepted

@@ -41,6 +41,8 @@
 /* SAME message limits */
 #define SAME_MAX_FIPS       31          /* max FIPS codes per message */
 #define SAME_FIPS_LEN       6           /* PSSCCC length */
+#define SAME_EVENT_LEN      3           /* EEE code length */
+#define SAME_MAX_BLACKLIST  32          /* max blacklisted event codes */
 
 /* USRP protocol constants */
 #define USRP_MAGIC          "USRP"
@@ -69,6 +71,8 @@ typedef struct {
     uint16_t    usrp_port;              /* USRP destination port */
     char        fips[SAME_MAX_FIPS][SAME_FIPS_LEN + 1];  /* watched FIPS codes */
     int         num_fips;               /* number of configured FIPS codes */
+    char        event_blacklist[SAME_MAX_BLACKLIST][SAME_EVENT_LEN + 1]; /* blocked event codes */
+    int         num_event_blacklist;    /* number of blacklisted event codes */
     int         enabled;                /* channel enabled flag */
 } channel_config_t;
 
