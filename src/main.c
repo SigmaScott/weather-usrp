@@ -132,7 +132,7 @@ static void capture_callback(const uint8_t *buf, uint32_t len, void *userdata)
 
             float decimated;
             if (decimator_process(&channels[ch].decimator, audio, &decimated)) {
-                float scaled = decimated * 16000.0f;
+                float scaled = decimated * 16000.0f * cfg.audio_gain;
                 if (scaled > 32767.0f) scaled = 32767.0f;
                 if (scaled < -32768.0f) scaled = -32768.0f;
                 int16_t sample = (int16_t)scaled;

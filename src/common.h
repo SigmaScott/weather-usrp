@@ -83,6 +83,7 @@ struct config_s {
     int         gain;                   /* tenths of dB, or -1 for auto */
     int         ppm;                    /* frequency correction */
     uint32_t    center_freq;            /* SDR center frequency in Hz */
+    float       audio_gain;             /* audio output multiplier (1.0 = default) */
 
     /* Channel configs */
     channel_config_t channels[NUM_CHANNELS];
