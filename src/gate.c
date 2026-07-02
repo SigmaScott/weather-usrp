@@ -39,9 +39,6 @@ void gate_process_audio(gate_t *gate, const int16_t *samples, int count)
     if (gate->state == GATE_IDLE)
         return;
 
-    if (gate->state == GATE_PASSTHROUGH && !gate->ptt_state)
-        return;
-
     for (int i = 0; i < count; i++) {
         gate->frame_buf[gate->frame_pos++] = samples[i];
         if (gate->frame_pos >= USRP_SAMPLES) {
@@ -113,8 +110,6 @@ void gate_set_passthrough(gate_t *gate, int on)
         gate->state = GATE_PASSTHROUGH;
         gate->frame_pos = 0;
         gate->frames_sent = 0;
-        gate->ptt_state = 1;
-        gate->ptt_toggle_ms = now_ms();
     } else {
         if (gate->state == GATE_PASSTHROUGH) {
             LOG_INFO("gate", "ch%d PASSTHROUGH -> IDLE (%lu frames sent)",
@@ -155,15 +150,6 @@ void gate_tick(gate_t *gate, uint64_t now)
                      (unsigned long)(now - gate->alert_start_ms),
                      gate->frames_sent);
             gate_eom(gate);
-        }
-    }
-
-    if (gate->state == GATE_PASSTHROUGH) {
-        if (now - gate->ptt_toggle_ms >= 5000) {
-            gate->ptt_state = !gate->ptt_state;
-            gate->ptt_toggle_ms = now;
-            LOG_INFO("gate", "ch%d PTT toggle -> %s",
-                     gate->channel, gate->ptt_state ? "ON" : "OFF");
         }
     }
 }

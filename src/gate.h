@@ -39,10 +39,6 @@ typedef struct {
     gate_event_cb_t event_cb;
     void            *event_userdata;
 
-    /* PTT toggle for passthrough testing */
-    uint64_t        ptt_toggle_ms;
-    int             ptt_state;
-
     /* Config reference */
     const channel_config_t *config;
 } gate_t;
