@@ -1,4 +1,5 @@
 #include "control.h"
+#include "log.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,15 +70,15 @@ static void handle_command(control_t *ctl, int client_fd, const char *cmd)
     int ch, on;
 
     if (parse_passthrough(cmd, &ch, &on) == 0) {
-        pthread_mutex_lock(&ctl->lock);
+        LOG_INFO("ctl", "passthrough ch%d %s", ch, on ? "ON" : "OFF");
         gate_set_passthrough(ctl->gates[ch], on);
-        pthread_mutex_unlock(&ctl->lock);
 
         snprintf(response, sizeof(response), "OK channel %d passthrough %s",
                  ch, on ? "on" : "off");
         send_to_client(client_fd, response);
 
     } else if (is_status_cmd(cmd)) {
+        LOG_DEBUG("ctl", "status request from fd=%d", client_fd);
         char json[2048];
         int pos = 0;
         pos += snprintf(json + pos, sizeof(json) - pos, "{\"channels\":[");
@@ -108,6 +109,7 @@ static void handle_command(control_t *ctl, int client_fd, const char *cmd)
         send_to_client(client_fd, "ERR invalid channel");
 
     } else {
+        LOG_WARN("ctl", "unknown command from fd=%d: '%s'", client_fd, cmd);
         send_to_client(client_fd, "ERR unknown command");
     }
 }
@@ -145,7 +147,11 @@ static void *control_thread(void *arg)
             if (fd >= 0) {
                 if (ctl->num_clients < 8) {
                     ctl->client_fds[ctl->num_clients++] = fd;
+                    LOG_INFO("ctl", "client connected fd=%d (%s:%d) [%d total]",
+                             fd, inet_ntoa(addr.sin_addr), ntohs(addr.sin_port),
+                             ctl->num_clients);
                 } else {
+                    LOG_WARN("ctl", "max clients reached, rejecting fd=%d", fd);
                     send_to_client(fd, "ERR max clients reached");
                     close(fd);
                 }
@@ -159,6 +165,8 @@ static void *control_thread(void *arg)
             char buf[MAX_CMD_LEN];
             ssize_t n = read(ctl->client_fds[i], buf, sizeof(buf) - 1);
             if (n <= 0) {
+                LOG_INFO("ctl", "client disconnected fd=%d [%d remaining]",
+                         ctl->client_fds[i], ctl->num_clients - 1);
                 close(ctl->client_fds[i]);
                 ctl->client_fds[i] = ctl->client_fds[--ctl->num_clients];
                 i--;
@@ -245,6 +253,7 @@ int control_init(control_t *ctl, const char *host, uint16_t port, gate_t **gates
         return -1;
     }
 
+    LOG_DEBUG("ctl", "listening on %s:%u", host, port);
     return 0;
 }
 
@@ -261,6 +270,7 @@ int control_start(control_t *ctl)
 
 void control_broadcast(control_t *ctl, const char *msg)
 {
+    LOG_DEBUG("ctl", "broadcast: %s", msg);
     pthread_mutex_lock(&ctl->lock);
     for (int i = 0; i < ctl->num_clients; i++)
         send_to_client(ctl->client_fds[i], msg);
