@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <time.h>
+#include <math.h>
 
 typedef struct channel_s {
     int             id;
@@ -23,6 +24,13 @@ typedef struct channel_s {
     eas_decoder_t   eas;
     gate_t          gate;
     const channel_config_t *config;
+
+    /* Signal diagnostics (accumulated between reports) */
+    float           sig_power_sum;
+    float           sig_power_peak;
+    float           fm_demod_sum;
+    float           fm_demod_peak;
+    unsigned long   sig_sample_count;
 } channel_t;
 
 static volatile int running = 1;
@@ -96,7 +104,18 @@ static void capture_callback(const uint8_t *buf, uint32_t len, void *userdata)
             if (!fir_chan_process(&channels[ch].channelizer, raw, &chan_out))
                 continue;
 
+            float power = chan_out.i * chan_out.i + chan_out.q * chan_out.q;
+            channels[ch].sig_power_sum += power;
+            if (power > channels[ch].sig_power_peak)
+                channels[ch].sig_power_peak = power;
+
             float audio = fm_demod_process(&channels[ch].demod, chan_out);
+
+            float abs_audio = audio < 0 ? -audio : audio;
+            channels[ch].fm_demod_sum += abs_audio;
+            if (abs_audio > channels[ch].fm_demod_peak)
+                channels[ch].fm_demod_peak = abs_audio;
+            channels[ch].sig_sample_count++;
 
             eas_process(&channels[ch].eas, &audio, 1);
 
@@ -235,6 +254,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Running. Press Ctrl-C to stop.\n");
 
     struct timespec ts;
+    int tick_count = 0;
     while (running) {
         ts.tv_sec = 0;
         ts.tv_nsec = 100000000;
@@ -244,6 +264,40 @@ int main(int argc, char *argv[])
         uint64_t now = (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
         for (int i = 0; i < NUM_CHANNELS; i++)
             gate_tick(&channels[i].gate, now);
+
+        tick_count++;
+        if (tick_count >= 50 && LOG_ENABLED(LOG_LVL_INFO)) {
+            tick_count = 0;
+            for (int i = 0; i < NUM_CHANNELS; i++) {
+                if (!cfg.channels[i].enabled)
+                    continue;
+                unsigned long n = channels[i].sig_sample_count;
+                if (n == 0) continue;
+
+                float avg_power = channels[i].sig_power_sum / n;
+                float peak_power = channels[i].sig_power_peak;
+                float avg_demod = channels[i].fm_demod_sum / n;
+                float peak_demod = channels[i].fm_demod_peak;
+
+                float avg_db = (avg_power > 1e-12f) ?
+                    10.0f * log10f(avg_power) : -120.0f;
+                float peak_db = (peak_power > 1e-12f) ?
+                    10.0f * log10f(peak_power) : -120.0f;
+
+                LOG_INFO("sig", "ch%d %.3fMHz: pwr avg=%.1fdB peak=%.1fdB | "
+                         "FM dev avg=%.3f peak=%.3f (%.0fHz)",
+                         i, cfg.channels[i].frequency / 1e6,
+                         avg_db, peak_db,
+                         avg_demod, peak_demod,
+                         peak_demod * 5000.0f);
+
+                channels[i].sig_power_sum = 0;
+                channels[i].sig_power_peak = 0;
+                channels[i].fm_demod_sum = 0;
+                channels[i].fm_demod_peak = 0;
+                channels[i].sig_sample_count = 0;
+            }
+        }
     }
 
     LOG_INFO("main", "shutting down...");
