@@ -1,4 +1,5 @@
 #include "dsp.h"
+#include "log.h"
 #include <math.h>
 #include <string.h>
 

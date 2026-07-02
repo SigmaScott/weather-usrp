@@ -23,6 +23,11 @@ typedef struct {
     int             gain;           /* tenths of dB, -1 = auto */
     int             ppm;
     uint32_t        device_index;
+
+    /* Stats (for debug logging) */
+    unsigned long   total_samples;
+    unsigned long   callback_count;
+    unsigned long   overflow_count;
 } capture_t;
 
 /*
