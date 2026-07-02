@@ -1,4 +1,5 @@
 #include "usrp.h"
+#include "log.h"
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -11,14 +12,14 @@ int usrp_init(usrp_conn_t *conn, const char *host, uint16_t port)
 
     conn->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (conn->sockfd < 0) {
-        perror("usrp: socket");
+        LOG_ERROR("usrp", "socket creation failed: %s:%u", host, port);
         return -1;
     }
 
     conn->dest_addr.sin_family = AF_INET;
     conn->dest_addr.sin_port = htons(port);
     if (inet_pton(AF_INET, host, &conn->dest_addr.sin_addr) <= 0) {
-        fprintf(stderr, "usrp: invalid host %s\n", host);
+        LOG_ERROR("usrp", "invalid host '%s'", host);
         close(conn->sockfd);
         conn->sockfd = -1;
         return -1;
@@ -26,6 +27,7 @@ int usrp_init(usrp_conn_t *conn, const char *host, uint16_t port)
 
     conn->seq = 0;
     conn->keyup = 0;
+    LOG_DEBUG("usrp", "socket ready -> %s:%u (fd=%d)", host, port, conn->sockfd);
     return 0;
 }
 
@@ -63,10 +65,13 @@ int usrp_send_audio(usrp_conn_t *conn, const int16_t *samples, int keyup)
                           (struct sockaddr *)&conn->dest_addr,
                           sizeof(conn->dest_addr));
     if (sent != USRP_FRAME_SIZE) {
-        perror("usrp: sendto");
+        LOG_ERROR("usrp", "sendto failed: sent=%zd expected=%d (fd=%d seq=%u)",
+                  sent, USRP_FRAME_SIZE, conn->sockfd, conn->seq - 1);
         return -1;
     }
 
+    LOG_TRACE("usrp", "audio frame seq=%u keyup=%d (fd=%d)",
+              conn->seq - 1, keyup, conn->sockfd);
     return 0;
 }
 

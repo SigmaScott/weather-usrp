@@ -1,4 +1,5 @@
 #include "gate.h"
+#include "log.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
@@ -19,14 +20,17 @@ int gate_init(gate_t *gate, int channel, const channel_config_t *cfg,
     gate->config = cfg;
     gate->event_cb = event_cb;
     gate->event_userdata = event_userdata;
-    gate->alert_timeout_ms = 600000; /* 10 min default max alert */
+    gate->alert_timeout_ms = 600000;
 
     if (usrp_init(&gate->usrp, cfg->usrp_host, cfg->usrp_port) < 0) {
-        fprintf(stderr, "gate[%d]: failed to init USRP to %s:%u\n",
-                channel, cfg->usrp_host, cfg->usrp_port);
+        LOG_ERROR("gate", "ch%d failed to init USRP to %s:%u",
+                  channel, cfg->usrp_host, cfg->usrp_port);
         return -1;
     }
 
+    LOG_DEBUG("gate", "ch%d init: USRP -> %s:%u, timeout=%lums",
+              channel, cfg->usrp_host, cfg->usrp_port,
+              (unsigned long)gate->alert_timeout_ms);
     return 0;
 }
 
@@ -39,6 +43,7 @@ void gate_process_audio(gate_t *gate, const int16_t *samples, int count)
         gate->frame_buf[gate->frame_pos++] = samples[i];
         if (gate->frame_pos >= USRP_SAMPLES) {
             usrp_send_audio(&gate->usrp, gate->frame_buf, 1);
+            gate->frames_sent++;
             gate->frame_pos = 0;
         }
     }
@@ -46,13 +51,17 @@ void gate_process_audio(gate_t *gate, const int16_t *samples, int count)
 
 void gate_alert(gate_t *gate, const same_message_t *msg)
 {
-    if (gate->state == GATE_PASSTHROUGH)
+    if (gate->state == GATE_PASSTHROUGH) {
+        LOG_DEBUG("gate", "ch%d alert ignored (in PASSTHROUGH)", gate->channel);
         return;
+    }
 
+    LOG_INFO("gate", "ch%d IDLE -> ALERT (event=%s)", gate->channel, msg->event);
     gate->state = GATE_ALERT;
     gate->current_alert = *msg;
     gate->alert_start_ms = now_ms();
     gate->frame_pos = 0;
+    gate->frames_sent = 0;
 
     if (gate->event_cb) {
         char json[1024];
@@ -65,10 +74,14 @@ void gate_alert(gate_t *gate, const same_message_t *msg)
 
 void gate_eom(gate_t *gate)
 {
-    if (gate->state != GATE_ALERT)
+    if (gate->state != GATE_ALERT) {
+        LOG_DEBUG("gate", "ch%d EOM ignored (state=%d, not ALERT)", gate->channel, gate->state);
         return;
+    }
 
-    /* Flush remaining samples as silence-padded frame */
+    LOG_INFO("gate", "ch%d ALERT -> IDLE (EOM, %lu frames sent)",
+             gate->channel, gate->frames_sent);
+
     if (gate->frame_pos > 0) {
         memset(gate->frame_buf + gate->frame_pos, 0,
                (USRP_SAMPLES - gate->frame_pos) * sizeof(int16_t));
@@ -76,7 +89,6 @@ void gate_eom(gate_t *gate)
         gate->frame_pos = 0;
     }
 
-    /* Send keyup=0 frame to release PTT */
     int16_t silence[USRP_SAMPLES] = {0};
     usrp_send_audio(&gate->usrp, silence, 0);
 
@@ -92,11 +104,16 @@ void gate_eom(gate_t *gate)
 void gate_set_passthrough(gate_t *gate, int on)
 {
     if (on) {
+        LOG_INFO("gate", "ch%d %s -> PASSTHROUGH",
+                 gate->channel,
+                 gate->state == GATE_IDLE ? "IDLE" : "ALERT");
         gate->state = GATE_PASSTHROUGH;
         gate->frame_pos = 0;
+        gate->frames_sent = 0;
     } else {
         if (gate->state == GATE_PASSTHROUGH) {
-            /* Flush and release PTT */
+            LOG_INFO("gate", "ch%d PASSTHROUGH -> IDLE (%lu frames sent)",
+                     gate->channel, gate->frames_sent);
             if (gate->frame_pos > 0) {
                 memset(gate->frame_buf + gate->frame_pos, 0,
                        (USRP_SAMPLES - gate->frame_pos) * sizeof(int16_t));
@@ -128,6 +145,10 @@ void gate_tick(gate_t *gate, uint64_t now)
 {
     if (gate->state == GATE_ALERT) {
         if (now - gate->alert_start_ms > gate->alert_timeout_ms) {
+            LOG_WARN("gate", "ch%d ALERT timeout after %lums (%lu frames sent)",
+                     gate->channel,
+                     (unsigned long)(now - gate->alert_start_ms),
+                     gate->frames_sent);
             gate_eom(gate);
         }
     }

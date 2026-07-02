@@ -33,6 +33,7 @@ typedef struct {
     /* Audio buffer for USRP framing (accumulate 160 samples) */
     int16_t         frame_buf[USRP_SAMPLES];
     int             frame_pos;
+    unsigned long   frames_sent;
 
     /* Event callback */
     gate_event_cb_t event_cb;
