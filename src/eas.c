@@ -1,4 +1,5 @@
 #include "eas.h"
+#include "log.h"
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
@@ -50,9 +51,16 @@ static void process_bit(eas_decoder_t *eas, int bit)
         if (eas->shift_reg == PREAMBLE_BYTE) {
             eas->preamble_count++;
             eas->bit_count = 0;
-            if (eas->preamble_count >= PREAMBLE_MIN)
+            if (eas->preamble_count >= PREAMBLE_MIN) {
                 eas->synced = 1;
+                LOG_DEBUG("eas", "ch%d preamble LOCKED (%d bytes)",
+                          eas->channel, eas->preamble_count);
+            }
         } else if (eas->bit_count >= 8) {
+            if (eas->preamble_count > 0) {
+                LOG_TRACE("eas", "ch%d preamble lost at count=%d (got 0x%02X)",
+                          eas->channel, eas->preamble_count, eas->shift_reg);
+            }
             eas->preamble_count = 0;
             eas->bit_count = 0;
         }
@@ -85,10 +93,13 @@ static void process_bit(eas_decoder_t *eas, int bit)
         strncmp(eas->msg_buf[eas->burst_idx], "NNNN", 4) == 0) {
         eas->msg_buf[eas->burst_idx][4] = '\0';
         eas->msg_len[eas->burst_idx] = 4;
+        LOG_DEBUG("eas", "ch%d EOM burst %d/3", eas->channel, eas->burst_idx + 1);
 
         for (int i = 0; i < eas->burst_idx; i++) {
             if (eas->msg_len[i] == 4 &&
                 strncmp(eas->msg_buf[i], "NNNN", 4) == 0) {
+                LOG_INFO("eas", "ch%d EOM confirmed (2-of-3 vote, bursts %d+%d)",
+                         eas->channel, i + 1, eas->burst_idx + 1);
                 if (eas->callback)
                     eas->callback(eas->channel, "NNNN", eas->userdata);
                 eas_reset(eas);
@@ -122,12 +133,17 @@ static void process_bit(eas_decoder_t *eas, int bit)
             if (dashes >= 3) {
                 eas->msg_buf[eas->burst_idx][eas->msg_pos] = '\0';
                 eas->msg_len[eas->burst_idx] = eas->msg_pos;
+                LOG_DEBUG("eas", "ch%d SAME burst %d/3 complete: %s",
+                          eas->channel, eas->burst_idx + 1,
+                          eas->msg_buf[eas->burst_idx]);
 
                 /* 2-of-3 voting */
                 for (int i = 0; i < eas->burst_idx; i++) {
                     if (eas->msg_len[i] == eas->msg_pos &&
                         strncmp(eas->msg_buf[i], eas->msg_buf[eas->burst_idx],
                                 eas->msg_pos) == 0) {
+                        LOG_INFO("eas", "ch%d SAME confirmed (vote: bursts %d+%d)",
+                                 eas->channel, i + 1, eas->burst_idx + 1);
                         if (eas->callback)
                             eas->callback(eas->channel,
                                           eas->msg_buf[eas->burst_idx],
@@ -139,6 +155,8 @@ static void process_bit(eas_decoder_t *eas, int bit)
 
                 eas->burst_idx++;
                 if (eas->burst_idx >= EAS_NUM_BURSTS) {
+                    LOG_WARN("eas", "ch%d SAME 3 bursts, no 2-of-3 match - using burst 1",
+                             eas->channel);
                     if (eas->callback)
                         eas->callback(eas->channel, eas->msg_buf[0], eas->userdata);
                     eas_reset(eas);
@@ -204,6 +222,9 @@ void eas_process(eas_decoder_t *eas, const float *samples, int count)
         /* Burst timeout detection */
         eas->silence_count++;
         if (eas->silence_count > eas->burst_timeout && eas->burst_idx > 0) {
+            LOG_WARN("eas", "ch%d burst timeout (had %d burst(s), using burst 1): %s",
+                     eas->channel, eas->burst_idx,
+                     eas->msg_len[0] > 0 ? eas->msg_buf[0] : "(empty)");
             if (eas->msg_len[0] > 0 && eas->callback)
                 eas->callback(eas->channel, eas->msg_buf[0], eas->userdata);
             eas_reset(eas);
