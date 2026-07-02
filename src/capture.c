@@ -65,7 +65,9 @@ int capture_init(capture_t *cap, const config_t *cfg)
 
     if (cfg->gain < 0) {
         rtlsdr_set_tuner_gain_mode(dev, 0);
-        LOG_INFO("sdr", "gain=auto");
+        int actual = rtlsdr_get_tuner_gain(dev);
+        LOG_INFO("sdr", "gain=auto (tuner reports %d = %.1f dB)",
+                 actual, actual / 10.0);
     } else {
         rtlsdr_set_tuner_gain_mode(dev, 1);
         rtlsdr_set_tuner_gain(dev, cfg->gain);

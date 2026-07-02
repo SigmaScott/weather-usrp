@@ -26,6 +26,8 @@ typedef struct {
 /* FM demodulator state */
 typedef struct {
     iq_sample_t prev;               /* previous IQ sample */
+    float       dc_prev_in;         /* DC-block: previous input */
+    float       dc_prev_out;        /* DC-block: previous output */
 } fm_demod_t;
 
 /* Audio decimator (48k -> 8k) */

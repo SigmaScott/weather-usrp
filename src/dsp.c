@@ -105,7 +105,15 @@ float fm_demod_process(fm_demod_t *fm, iq_sample_t in)
     float dq = in.q * fm->prev.i - in.i * fm->prev.q;
     fm->prev = in;
 
-    return atan2f(dq, di) / (float)M_PI;
+    float raw = atan2f(dq, di) / (float)M_PI;
+
+    /* DC-blocking filter: y[n] = x[n] - x[n-1] + alpha*y[n-1]
+     * alpha = 0.998 gives ~15 Hz cutoff at 48 kHz sample rate */
+    float out = raw - fm->dc_prev_in + 0.998f * fm->dc_prev_out;
+    fm->dc_prev_in = raw;
+    fm->dc_prev_out = out;
+
+    return out;
 }
 
 void decimator_init(decimator_t *dec)

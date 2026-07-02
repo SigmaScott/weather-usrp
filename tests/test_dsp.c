@@ -37,20 +37,21 @@ static void test_fm_demod_positive_freq(void)
     fm_demod_init(&fm);
 
     float phase = 0.0f;
-    float freq = 0.25f;
-    float results[100];
+    float mod_freq = 0.01f;
+    float dev = 0.2f;
+    int n = 2000;
+    float peak = 0.0f;
 
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < n; i++) {
+        float mod = dev * sinf(2.0f * (float)M_PI * mod_freq * i);
+        phase += 2.0f * (float)M_PI * mod;
         iq_sample_t s = {cosf(phase), sinf(phase)};
-        results[i] = fm_demod_process(&fm, s);
-        phase += 2.0f * (float)M_PI * freq;
+        float out = fm_demod_process(&fm, s);
+        if (i > 500 && fabsf(out) > peak)
+            peak = fabsf(out);
     }
 
-    float avg = 0.0f;
-    for (int i = 10; i < 100; i++) avg += results[i];
-    avg /= 90.0f;
-
-    ASSERT_NEAR(avg, freq * 2.0, 0.05, "positive freq demod ~0.5");
+    ASSERT_NEAR(peak, dev * 2.0, 0.05, "positive freq demod tracks modulation");
 }
 
 static void test_channelizer_passthrough(void)
