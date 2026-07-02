@@ -253,8 +253,8 @@ int main(int argc, char *argv[])
     capture.callback = capture_callback;
     capture.userdata = NULL;
 
-    LOG_INFO("main", "capture: %.3f MHz @ %u S/s",
-             cfg.center_freq / 1e6, CAPTURE_SAMPLE_RATE);
+    LOG_INFO("main", "capture: %.3f MHz @ %u S/s, audio_gain=%.1f",
+             cfg.center_freq / 1e6, CAPTURE_SAMPLE_RATE, cfg.audio_gain);
 
     if (capture_start(&capture) < 0) {
         control_stop(&control);
