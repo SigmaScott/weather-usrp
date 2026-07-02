@@ -6,6 +6,7 @@
 #include "same.h"
 #include "gate.h"
 #include "control.h"
+#include "log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -48,12 +49,15 @@ static void eas_alert_handler(int channel, const char *message, void *userdata)
 {
     (void)userdata;
     same_message_t msg;
-    if (same_parse(&msg, message) < 0)
+    if (same_parse(&msg, message) < 0) {
+        LOG_WARN("same", "ch%d parse failed: %.40s...", channel, message);
         return;
+    }
 
     channel_t *ch = &channels[channel];
 
     if (msg.is_eom) {
+        LOG_DEBUG("same", "ch%d received EOM", channel);
         gate_eom(&ch->gate);
         return;
     }
@@ -61,14 +65,16 @@ static void eas_alert_handler(int channel, const char *message, void *userdata)
     if (same_match_fips(&msg, ch->config->fips, ch->config->num_fips)) {
         if (same_event_blacklisted(&msg, ch->config->event_blacklist,
                                    ch->config->num_event_blacklist)) {
-            fprintf(stderr, "[ch%d] BLOCKED (blacklisted event %s)\n",
-                    channel, msg.event);
+            LOG_INFO("same", "ch%d BLOCKED (blacklisted event %s)",
+                     channel, msg.event);
             return;
         }
         char formatted[256];
         same_format(&msg, formatted, sizeof(formatted));
-        fprintf(stderr, "[ch%d] ALERT: %s\n", channel, formatted);
+        LOG_INFO("same", "ch%d ALERT: %s", channel, formatted);
         gate_alert(&ch->gate, &msg);
+    } else {
+        LOG_DEBUG("same", "ch%d no FIPS match (event=%s)", channel, msg.event);
     }
 }
 
@@ -108,7 +114,10 @@ static void capture_callback(const uint8_t *buf, uint32_t len, void *userdata)
 
 static void usage(const char *prog)
 {
-    fprintf(stderr, "Usage: %s [-c config.ini] [-v]\n", prog);
+    fprintf(stderr, "Usage: %s [-c config.ini] [-v [-v [-v]]]\n", prog);
+    fprintf(stderr, "  -v     INFO level (operational events)\n");
+    fprintf(stderr, "  -vv    DEBUG level (per-event detail)\n");
+    fprintf(stderr, "  -vvv   TRACE level (hot-path data)\n");
     fprintf(stderr, "  Default config search: ./config.ini, /etc/weather-usrp/config.ini\n");
     exit(1);
 }
@@ -140,15 +149,17 @@ int main(int argc, char *argv[])
     while ((opt = getopt(argc, argv, "c:vh")) != -1) {
         switch (opt) {
         case 'c': config_path = optarg; break;
-        case 'v': verbose = 1; break;
+        case 'v': verbose++; break;
         default: usage(argv[0]);
         }
     }
 
+    log_init(verbose);
+
     if (!config_path) {
         config_path = find_config();
         if (!config_path) {
-            fprintf(stderr, "No config file found (tried ./config.ini, /etc/weather-usrp/config.ini)\n");
+            LOG_ERROR("main", "no config file found (tried ./config.ini, /etc/weather-usrp/config.ini)");
             fprintf(stderr, "Use -c <path> to specify config file\n");
             return 1;
         }
@@ -158,10 +169,9 @@ int main(int argc, char *argv[])
         return 1;
     cfg.verbose = verbose;
 
-    if (verbose) {
-        fprintf(stderr, "Using config: %s\n", config_path);
+    LOG_INFO("main", "config loaded: %s", config_path);
+    if (verbose >= 2)
         config_dump(&cfg);
-    }
 
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
@@ -180,40 +190,48 @@ int main(int argc, char *argv[])
 
         if (gate_init(&channels[i].gate, i, &cfg.channels[i],
                       gate_event_handler, &control) < 0) {
-            fprintf(stderr, "Failed to init gate for channel %d\n", i);
+            LOG_ERROR("main", "failed to init gate for channel %d", i);
             return 1;
         }
         gate_ptrs[i] = &channels[i].gate;
+
+        if (cfg.channels[i].enabled) {
+            LOG_DEBUG("main", "ch%d: %.3f MHz, offset=%+.1f kHz, USRP -> %s:%u",
+                      i, cfg.channels[i].frequency / 1e6,
+                      freq_offset / 1000.0,
+                      cfg.channels[i].usrp_host, cfg.channels[i].usrp_port);
+        }
     }
 
     if (control_init(&control, cfg.control_host, cfg.control_port,
                      gate_ptrs) < 0) {
-        fprintf(stderr, "Failed to init control server\n");
+        LOG_ERROR("main", "failed to init control server");
         return 1;
     }
 
     if (control_start(&control) < 0)
         return 1;
 
-    fprintf(stderr, "Control server on %s:%u\n",
-            cfg.control_host, cfg.control_port);
+    LOG_INFO("main", "control server on %s:%u",
+             cfg.control_host, cfg.control_port);
 
     if (capture_init(&capture, &cfg) < 0) {
-        fprintf(stderr, "Failed to init RTL-SDR capture\n");
+        LOG_ERROR("main", "failed to init RTL-SDR capture");
         control_stop(&control);
         return 1;
     }
     capture.callback = capture_callback;
     capture.userdata = NULL;
 
-    fprintf(stderr, "Capture: %.3f MHz @ %u S/s\n",
-            CAPTURE_CENTER_FREQ / 1e6, CAPTURE_SAMPLE_RATE);
+    LOG_INFO("main", "capture: %.3f MHz @ %u S/s",
+             CAPTURE_CENTER_FREQ / 1e6, CAPTURE_SAMPLE_RATE);
 
     if (capture_start(&capture) < 0) {
         control_stop(&control);
         return 1;
     }
 
+    LOG_INFO("main", "running (verbosity=%d)", verbose);
     fprintf(stderr, "Running. Press Ctrl-C to stop.\n");
 
     struct timespec ts;
@@ -228,7 +246,7 @@ int main(int argc, char *argv[])
             gate_tick(&channels[i].gate, now);
     }
 
-    fprintf(stderr, "\nShutting down...\n");
+    LOG_INFO("main", "shutting down...");
     capture_stop(&capture);
     control_stop(&control);
 
