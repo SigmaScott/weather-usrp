@@ -40,6 +40,9 @@ static gate_t *gate_ptrs[NUM_CHANNELS];
 static capture_t capture;
 static control_t control;
 
+static unsigned long adc_clip_count;
+static unsigned long adc_total_count;
+
 static void signal_handler(int sig)
 {
     (void)sig;
@@ -90,6 +93,14 @@ static void capture_callback(const uint8_t *buf, uint32_t len, void *userdata)
 {
     (void)userdata;
     if (len < 2) return;
+
+    unsigned long clips = 0;
+    for (uint32_t i = 0; i < len; i++) {
+        if (buf[i] == 0 || buf[i] == 255)
+            clips++;
+    }
+    adc_clip_count += clips;
+    adc_total_count += len;
 
     for (uint32_t i = 0; i + 1 < len; i += 2) {
         iq_sample_t raw;
@@ -268,6 +279,15 @@ int main(int argc, char *argv[])
         tick_count++;
         if (tick_count >= 50 && LOG_ENABLED(LOG_LVL_INFO)) {
             tick_count = 0;
+
+            if (adc_total_count > 0) {
+                float clip_pct = 100.0f * adc_clip_count / adc_total_count;
+                LOG_INFO("adc", "clip: %lu/%lu samples (%.2f%%)",
+                         adc_clip_count, adc_total_count, clip_pct);
+                adc_clip_count = 0;
+                adc_total_count = 0;
+            }
+
             for (int i = 0; i < NUM_CHANNELS; i++) {
                 if (!cfg.channels[i].enabled)
                     continue;
