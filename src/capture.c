@@ -42,7 +42,7 @@ static void *capture_thread(void *arg)
 int capture_init(capture_t *cap, const config_t *cfg)
 {
     memset(cap, 0, sizeof(*cap));
-    cap->center_freq = CAPTURE_CENTER_FREQ;
+    cap->center_freq = cfg->center_freq;
     cap->sample_rate = CAPTURE_SAMPLE_RATE;
     cap->gain = cfg->gain;
     cap->ppm = cfg->ppm;

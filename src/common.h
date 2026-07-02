@@ -82,6 +82,7 @@ struct config_s {
     uint32_t    device_index;
     int         gain;                   /* tenths of dB, or -1 for auto */
     int         ppm;                    /* frequency correction */
+    uint32_t    center_freq;            /* SDR center frequency in Hz */
 
     /* Channel configs */
     channel_config_t channels[NUM_CHANNELS];

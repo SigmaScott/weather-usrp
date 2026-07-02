@@ -210,7 +210,7 @@ int main(int argc, char *argv[])
         channels[i].id = i;
         channels[i].config = &cfg.channels[i];
 
-        double freq_offset = cfg.channels[i].frequency - CAPTURE_CENTER_FREQ;
+        double freq_offset = cfg.channels[i].frequency - cfg.center_freq;
         fir_chan_init(&channels[i].channelizer, freq_offset,
                      CAPTURE_SAMPLE_RATE, 20000.0);
         fm_demod_init(&channels[i].demod);
@@ -254,7 +254,7 @@ int main(int argc, char *argv[])
     capture.userdata = NULL;
 
     LOG_INFO("main", "capture: %.3f MHz @ %u S/s",
-             CAPTURE_CENTER_FREQ / 1e6, CAPTURE_SAMPLE_RATE);
+             cfg.center_freq / 1e6, CAPTURE_SAMPLE_RATE);
 
     if (capture_start(&capture) < 0) {
         control_stop(&control);

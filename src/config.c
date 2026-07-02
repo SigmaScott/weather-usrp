@@ -70,6 +70,7 @@ int config_load(config_t *cfg, const char *path)
 
     memset(cfg, 0, sizeof(*cfg));
     cfg->gain = -1;
+    cfg->center_freq = CAPTURE_CENTER_FREQ;
     strncpy(cfg->control_host, "127.0.0.1", sizeof(cfg->control_host));
     cfg->control_port = 5555;
 
@@ -129,6 +130,8 @@ int config_load(config_t *cfg, const char *path)
                 cfg->gain = atoi(val);
             else if (strcmp(key, "ppm") == 0)
                 cfg->ppm = atoi(val);
+            else if (strcmp(key, "center_freq") == 0)
+                cfg->center_freq = (uint32_t)strtoul(val, NULL, 10);
             break;
 
         case SEC_CONTROL:
@@ -166,8 +169,8 @@ int config_load(config_t *cfg, const char *path)
 
 void config_dump(const config_t *cfg)
 {
-    printf("SDR: device=%u gain=%d ppm=%d\n",
-           cfg->device_index, cfg->gain, cfg->ppm);
+    printf("SDR: device=%u gain=%d ppm=%d center_freq=%.6f MHz\n",
+           cfg->device_index, cfg->gain, cfg->ppm, cfg->center_freq / 1e6);
     printf("Control: %s:%u\n", cfg->control_host, cfg->control_port);
     for (int i = 0; i < NUM_CHANNELS; i++) {
         const channel_config_t *ch = &cfg->channels[i];
