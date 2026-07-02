@@ -39,12 +39,13 @@ void gate_process_audio(gate_t *gate, const int16_t *samples, int count)
     if (gate->state == GATE_IDLE)
         return;
 
-    int keyup = (gate->state == GATE_PASSTHROUGH) ? gate->ptt_state : 1;
+    if (gate->state == GATE_PASSTHROUGH && !gate->ptt_state)
+        return;
 
     for (int i = 0; i < count; i++) {
         gate->frame_buf[gate->frame_pos++] = samples[i];
         if (gate->frame_pos >= USRP_SAMPLES) {
-            usrp_send_audio(&gate->usrp, gate->frame_buf, keyup);
+            usrp_send_audio(&gate->usrp, gate->frame_buf, 1);
             gate->frames_sent++;
             gate->frame_pos = 0;
         }
