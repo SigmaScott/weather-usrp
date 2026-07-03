@@ -56,6 +56,9 @@ typedef struct {
     void        *userdata;
     int         channel;
 
+    /* Config */
+    int         min_bursts;
+
     /* Sample rate */
     float       sample_rate;
 } eas_decoder_t;
@@ -64,7 +67,7 @@ typedef struct {
  * Initialize EAS decoder for given sample rate.
  */
 void eas_init(eas_decoder_t *eas, float sample_rate, int channel,
-              eas_callback_t callback, void *userdata);
+              int min_bursts, eas_callback_t callback, void *userdata);
 
 /*
  * Process audio samples through EAS decoder.

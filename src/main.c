@@ -217,7 +217,7 @@ int main(int argc, char *argv[])
         fm_demod_init(&channels[i].demod);
         decimator_init(&channels[i].decimator);
         eas_init(&channels[i].eas, CHANNEL_AUDIO_RATE, i,
-                 eas_alert_handler, NULL);
+                 cfg.eas_min_bursts, eas_alert_handler, NULL);
 
         if (gate_init(&channels[i].gate, i, &cfg.channels[i],
                       gate_event_handler, &control) < 0) {

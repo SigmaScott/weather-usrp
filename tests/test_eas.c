@@ -61,7 +61,7 @@ static int generate_same_burst(float *buf, const char *message, float sample_rat
 static void test_eas_decode_zczc(void)
 {
     eas_decoder_t eas;
-    eas_init(&eas, 48000.0f, 0, test_eas_callback, NULL);
+    eas_init(&eas, 48000.0f, 0, 2, test_eas_callback, NULL);
 
     const char *same_msg = "ZCZC-WXR-TOR-048453+0100-1411545-KHOU/NWS-";
     float buf[500000];
@@ -90,7 +90,7 @@ static void test_eas_decode_zczc(void)
 static void test_eas_decode_nnnn(void)
 {
     eas_decoder_t eas;
-    eas_init(&eas, 48000.0f, 0, test_eas_callback, NULL);
+    eas_init(&eas, 48000.0f, 0, 2, test_eas_callback, NULL);
 
     float buf[200000];
     callback_count = 0;
@@ -117,7 +117,7 @@ static void test_eas_decode_nnnn(void)
 static void test_eas_reset(void)
 {
     eas_decoder_t eas;
-    eas_init(&eas, 48000.0f, 0, test_eas_callback, NULL);
+    eas_init(&eas, 48000.0f, 0, 2, test_eas_callback, NULL);
     callback_count = 0;
 
     eas_reset(&eas);

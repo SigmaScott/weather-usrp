@@ -13,11 +13,12 @@
 #define BURST_GAP_SECS  3.0f
 
 void eas_init(eas_decoder_t *eas, float sample_rate, int channel,
-              eas_callback_t callback, void *userdata)
+              int min_bursts, eas_callback_t callback, void *userdata)
 {
     memset(eas, 0, sizeof(*eas));
     eas->sample_rate = sample_rate;
     eas->channel = channel;
+    eas->min_bursts = min_bursts;
     eas->callback = callback;
     eas->userdata = userdata;
 
@@ -95,10 +96,19 @@ static void process_bit(eas_decoder_t *eas, int bit)
         eas->msg_len[eas->burst_idx] = 4;
         LOG_DEBUG("eas", "ch%d EOM burst %d/3", eas->channel, eas->burst_idx + 1);
 
+        if (eas->burst_idx + 1 >= eas->min_bursts) {
+            LOG_INFO("eas", "ch%d EOM confirmed (burst %d, min=%d)",
+                     eas->channel, eas->burst_idx + 1, eas->min_bursts);
+            if (eas->callback)
+                eas->callback(eas->channel, "NNNN", eas->userdata);
+            eas_reset(eas);
+            return;
+        }
+
         for (int i = 0; i < eas->burst_idx; i++) {
             if (eas->msg_len[i] == 4 &&
                 strncmp(eas->msg_buf[i], "NNNN", 4) == 0) {
-                LOG_INFO("eas", "ch%d EOM confirmed (2-of-3 vote, bursts %d+%d)",
+                LOG_INFO("eas", "ch%d EOM confirmed (vote: bursts %d+%d)",
                          eas->channel, i + 1, eas->burst_idx + 1);
                 if (eas->callback)
                     eas->callback(eas->channel, "NNNN", eas->userdata);
@@ -137,7 +147,18 @@ static void process_bit(eas_decoder_t *eas, int bit)
                           eas->channel, eas->burst_idx + 1,
                           eas->msg_buf[eas->burst_idx]);
 
-                /* 2-of-3 voting */
+                if (eas->burst_idx + 1 >= eas->min_bursts) {
+                    LOG_INFO("eas", "ch%d SAME confirmed (burst %d, min=%d): %s",
+                             eas->channel, eas->burst_idx + 1, eas->min_bursts,
+                             eas->msg_buf[eas->burst_idx]);
+                    if (eas->callback)
+                        eas->callback(eas->channel,
+                                      eas->msg_buf[eas->burst_idx],
+                                      eas->userdata);
+                    eas_reset(eas);
+                    return;
+                }
+
                 for (int i = 0; i < eas->burst_idx; i++) {
                     if (eas->msg_len[i] == eas->msg_pos &&
                         strncmp(eas->msg_buf[i], eas->msg_buf[eas->burst_idx],
@@ -155,7 +176,7 @@ static void process_bit(eas_decoder_t *eas, int bit)
 
                 eas->burst_idx++;
                 if (eas->burst_idx >= EAS_NUM_BURSTS) {
-                    LOG_WARN("eas", "ch%d SAME 3 bursts, no 2-of-3 match - using burst 1",
+                    LOG_WARN("eas", "ch%d SAME 3 bursts, no match - using burst 1",
                              eas->channel);
                     if (eas->callback)
                         eas->callback(eas->channel, eas->msg_buf[0], eas->userdata);

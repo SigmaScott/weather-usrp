@@ -72,6 +72,7 @@ int config_load(config_t *cfg, const char *path)
     cfg->gain = -1;
     cfg->center_freq = CAPTURE_CENTER_FREQ;
     cfg->audio_gain = 1.0f;
+    cfg->eas_min_bursts = 2;
     strncpy(cfg->control_host, "127.0.0.1", sizeof(cfg->control_host));
     cfg->control_port = 5555;
 
@@ -135,6 +136,10 @@ int config_load(config_t *cfg, const char *path)
                 cfg->center_freq = (uint32_t)strtoul(val, NULL, 10);
             else if (strcmp(key, "audio_gain") == 0)
                 cfg->audio_gain = (float)atof(val);
+            else if (strcmp(key, "eas_min_bursts") == 0) {
+                int v = atoi(val);
+                if (v >= 1 && v <= 3) cfg->eas_min_bursts = v;
+            }
             break;
 
         case SEC_CONTROL:
