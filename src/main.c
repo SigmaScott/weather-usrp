@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
         return 1;
     cfg.verbose = verbose;
 
-    LOG_INFO("main", "config loaded: %s", config_path);
+    LOG_INFO("main", "weather-usrp %s config loaded: %s", GIT_HASH, config_path);
     if (verbose >= 2)
         config_dump(&cfg);
 

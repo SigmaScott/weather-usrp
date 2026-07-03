@@ -1,5 +1,6 @@
 CC = gcc
-CFLAGS = -D_POSIX_C_SOURCE=200809L -Wall -Wextra -O2 -pthread
+GIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+CFLAGS = -D_POSIX_C_SOURCE=200809L -DGIT_HASH=\"$(GIT_HASH)\" -Wall -Wextra -O2 -pthread
 LDFLAGS = -lrtlsdr -lusb-1.0 -lm -lpthread
 
 SRCDIR = src
