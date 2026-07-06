@@ -1,3 +1,6 @@
+<img width="1408" height="768" alt="Weather-usrp" src="https://github.com/user-attachments/assets/a5a07943-922a-40e3-ba12-6c7ffd441dd4" />
+
+
 # weather-usrp
 
 NOAA Weather Radio EAS/SAME alert gate for AllStarLink.
@@ -294,8 +297,7 @@ The RTL-SDR tuner cannot lock to the requested frequency. This indicates a hardw
 ### No EAS decode
 
 - Check signal diagnostics at `-vv` — you need visible power above the noise floor
-- Verify your transmitter uses narrowband FM (±5 kHz deviation) if testing with a radio
-- Wideband FM (±25 kHz) will distort the AFSK tones beyond recognition
+
 
 ### Audio too quiet
 
