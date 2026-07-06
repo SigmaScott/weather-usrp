@@ -1,4 +1,5 @@
-<img width="1408" height="768" alt="Weather-usrp" src="https://github.com/user-attachments/assets/a5a07943-922a-40e3-ba12-6c7ffd441dd4" />
+<img width="1408" height="768" alt="Weather-usrp2" src="https://github.com/user-attachments/assets/4142969a-09b8-4590-818b-fc89ea568f37" />
+
 
 
 # weather-usrp
