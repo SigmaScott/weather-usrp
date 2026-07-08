@@ -310,4 +310,4 @@ Reduce `gain` from -1 (auto) to a fixed value, or add an attenuator between ante
 
 ## License
 
-GPL v2
+GPL v3
