@@ -109,13 +109,16 @@ int same_match_fips(const same_message_t *msg,
         if (strcmp(msg->fips[i] + 1, "00000") == 0)
             return 1;
 
-        /* Strip P-digit: compare only SSCCC (last 5 chars) */
-        const char *msg_ssccc = msg->fips[i] + 1;
-
         for (int j = 0; j < num_fips; j++) {
-            const char *cfg_ssccc = fips_list[j] + 1;
-            if (strncmp(msg_ssccc, cfg_ssccc, 5) == 0)
-                return 1;
+            if (fips_list[j][0] == '0') {
+                /* County-wide config (0SSCCC): P-digit ignored, SSCCC compared */
+                if (strncmp(msg->fips[i] + 1, fips_list[j] + 1, 5) == 0)
+                    return 1;
+            } else {
+                /* Sub-area config (PSSCCC): exact 6-digit match */
+                if (strncmp(msg->fips[i], fips_list[j], SAME_FIPS_LEN) == 0)
+                    return 1;
+            }
         }
     }
 

@@ -102,7 +102,11 @@ Each `[channelN]` section (0–6) maps to one NWR frequency.
 
 ### FIPS Codes
 
-FIPS codes are 6-digit location identifiers in the format PSSCCC (P=part, SS=state, CCC=county). The P-digit is stripped during comparison, so `048453` matches any sub-area of county 48453.
+FIPS codes are 6-digit location identifiers in the format PSSCCC (P=part, SS=state, CCC=county).
+
+- A code with a leading `0` (`0SSCCC`) matches the whole county: the P-digit is ignored during comparison, so `048453` matches a message for county 48453 or any of its sub-areas.
+- A code with a leading `1`–`9` (`PSSCCC`) matches only that specific sub-area: all six digits must match, so `148453` matches only sub-area 1 of county 48453.
+- Configure `0SSCCC` for county-wide alerts, or `PSSCCC` for a specific sub-area. Multiple codes are OR'd together and may be mixed.
 
 National alerts (FIPS 000000) always match regardless of configuration.
 

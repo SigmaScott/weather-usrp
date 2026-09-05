@@ -18,7 +18,10 @@
  * same.h - SAME message parser and FIPS code matcher
  *
  * Parses the ZCZC-ORG-EEE-PSSCCC-PSSCCC+TTTT-JJJHHMM-CCCCCCCC- format
- * and matches against configured FIPS codes (with P-digit stripping).
+ * and matches against configured FIPS codes. A configured code with a
+ * leading '0' (0SSCCC) matches the whole county (P-digit ignored on both
+ * sides); a configured code with a leading '1'-'9' (PSSCCC) matches only
+ * that specific sub-area (exact 6-digit match).
  */
 
 #ifndef SAME_H
@@ -58,7 +61,12 @@ int same_parse(same_message_t *msg, const char *raw);
 
 /*
  * Check if a parsed SAME message matches any of the given FIPS codes.
- * Performs P-digit stripping: compares only SSCCC (5 digits).
+ * Matching depends on the leading digit of each configured entry:
+ *   - '0' prefix (0SSCCC): county-wide. The P-digit is ignored on both
+ *     sides and only SSCCC (5 digits) are compared, so 048453 matches
+ *     any sub-area of county 48453.
+ *   - '1'-'9' prefix (PSSCCC): exact sub-area. All 6 digits must match,
+ *     so 148453 matches only sub-area 1 of county 48453.
  * fips_list: array of 6-char FIPS strings to match against
  * num_fips: number of entries in fips_list
  *

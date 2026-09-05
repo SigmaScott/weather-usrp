@@ -95,6 +95,46 @@ static void test_same_match_fips_empty_filter(void)
                   "empty filter matches all");
 }
 
+static void test_same_match_fips_subarea_exact(void)
+{
+    same_message_t msg;
+    same_parse(&msg, "ZCZC-WXR-TOR-148453+0100-1411545-KHOU/NWS-");
+
+    char fips[][SAME_FIPS_LEN + 1] = {"148453"};
+    ASSERT_EQ_INT(same_match_fips(&msg, fips, 1), 1,
+                  "sub-area config matches same sub-area");
+}
+
+static void test_same_match_fips_subarea_distinct(void)
+{
+    same_message_t msg;
+    same_parse(&msg, "ZCZC-WXR-TOR-248453+0100-1411545-KHOU/NWS-");
+
+    char fips[][SAME_FIPS_LEN + 1] = {"148453"};
+    ASSERT_EQ_INT(same_match_fips(&msg, fips, 1), 0,
+                  "sub-area config does not match different sub-area");
+}
+
+static void test_same_match_fips_subarea_vs_county(void)
+{
+    same_message_t msg;
+    same_parse(&msg, "ZCZC-WXR-TOR-048453+0100-1411545-KHOU/NWS-");
+
+    char fips[][SAME_FIPS_LEN + 1] = {"148453"};
+    ASSERT_EQ_INT(same_match_fips(&msg, fips, 1), 0,
+                  "sub-area config does not match county-wide message");
+}
+
+static void test_same_match_fips_county_catches_subarea(void)
+{
+    same_message_t msg;
+    same_parse(&msg, "ZCZC-WXR-TOR-248453+0100-1411545-KHOU/NWS-");
+
+    char fips[][SAME_FIPS_LEN + 1] = {"048453"};
+    ASSERT_EQ_INT(same_match_fips(&msg, fips, 1), 1,
+                  "county-wide config matches any sub-area");
+}
+
 static void test_same_format_json(void)
 {
     same_message_t msg;
@@ -169,6 +209,10 @@ int main(void)
     RUN_TEST(test_same_match_fips_national);
     RUN_TEST(test_same_match_fips_no_match);
     RUN_TEST(test_same_match_fips_empty_filter);
+    RUN_TEST(test_same_match_fips_subarea_exact);
+    RUN_TEST(test_same_match_fips_subarea_distinct);
+    RUN_TEST(test_same_match_fips_subarea_vs_county);
+    RUN_TEST(test_same_match_fips_county_catches_subarea);
     RUN_TEST(test_same_format_json);
     RUN_TEST(test_same_event_blacklisted_match);
     RUN_TEST(test_same_event_blacklisted_no_match);
