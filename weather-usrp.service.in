@@ -1,0 +1,18 @@
+[Unit]
+Description=NOAA Weather Radio EAS/SAME alert gate for AllStarLink
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=@BINDIR@/weather-usrp -v
+DynamicUser=yes
+SupplementaryGroups=plugdev
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

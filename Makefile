@@ -17,7 +17,7 @@ TEST_BINS = $(patsubst $(TESTDIR)/%.c, $(OBJDIR)/%, $(TEST_SRCS))
 
 LIB_OBJS = $(filter-out $(OBJDIR)/main.o, $(OBJS))
 
-.PHONY: all clean test
+.PHONY: all clean test install install-bin install-service install-config uninstall FORCE
 
 all: $(TARGET)
 
@@ -45,3 +45,44 @@ test: $(TEST_BINS)
 
 clean:
 	rm -rf $(OBJDIR) $(TARGET)
+
+# ---------------------------------------------------------------------------
+# Installation  (install vars are distinct from the build-time BINDIR = .)
+# ---------------------------------------------------------------------------
+PREFIX          ?= /usr/local
+INSTALL_BINDIR  ?= $(PREFIX)/bin
+CONFDIR         ?= /etc/weather-usrp
+SYSTEMD_DIR     ?= $(PREFIX)/lib/systemd/system
+
+UNIT_IN  = weather-usrp.service.in
+UNIT_OUT = $(OBJDIR)/weather-usrp.service
+
+install: install-bin install-service install-config
+	@echo "Installed. Next steps:"
+	@echo "  sudo systemctl daemon-reload"
+	@echo "  sudo systemctl enable --now weather-usrp"
+	@echo "Review $(CONFDIR)/config.ini before starting (FIPS codes)."
+
+install-bin: $(TARGET)
+	install -d $(DESTDIR)$(INSTALL_BINDIR)
+	install -m 0755 $(TARGET) $(DESTDIR)$(INSTALL_BINDIR)/weather-usrp
+
+$(UNIT_OUT): $(UNIT_IN) FORCE
+	sed 's|@BINDIR@|$(INSTALL_BINDIR)|g' $< > $@
+
+install-service: $(UNIT_OUT)
+	install -d $(DESTDIR)$(SYSTEMD_DIR)
+	install -m 0644 $(UNIT_OUT) $(DESTDIR)$(SYSTEMD_DIR)/weather-usrp.service
+
+install-config: config.ini
+	install -d $(DESTDIR)$(CONFDIR)
+	@if [ -f $(DESTDIR)$(CONFDIR)/config.ini ]; then \
+		echo "config.ini already installed - not overwriting"; \
+	else \
+		install -m 0644 config.ini $(DESTDIR)$(CONFDIR)/config.ini; \
+	fi
+
+uninstall:
+	rm -f $(DESTDIR)$(INSTALL_BINDIR)/weather-usrp
+	rm -f $(DESTDIR)$(SYSTEMD_DIR)/weather-usrp.service
+	@echo "Left $(CONFDIR)/config.ini in place (your settings)."

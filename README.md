@@ -50,6 +50,21 @@ Run tests:
 make test
 ```
 
+### Installing
+
+```sh
+sudo make install
+sudo systemctl daemon-reload
+sudo systemctl enable --now weather-usrp
+```
+
+Installs the binary to `/usr/local/bin`, the unit to
+`/usr/local/lib/systemd/system`, and a sample config to
+`/etc/weather-usrp/config.ini` (existing config is never overwritten).
+Edit that config for your FIPS codes, then control the service with
+`systemctl start|stop|restart|status weather-usrp`. Logs:
+`journalctl -u weather-usrp`.
+
 ## Configuration
 
 Edit `config.ini`:
